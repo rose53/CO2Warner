@@ -13,6 +13,7 @@ class Color {
 
     public:
         Color() {r = 0; g = 0; b = 0;}
+        Color(const Color& color);
         Color(uint8_t r, uint8_t g, uint8_t b);
 
 
@@ -27,12 +28,13 @@ class Color {
         uint8_t getBlue()  const { return b; }
 
         uint32_t getPackedColor() const { return ((uint32_t)r << 16) | ((uint32_t)g <<  8) | b; };
+        uint32_t getPackedColorGRB() const { return ((uint32_t)g << 16) | ((uint32_t)r <<  8) | b; };
 
-        static const Color& interpolate(const Color& c1, const Color& c2, float factor);
+        void dump(Stream& stream) const;
+
+        static const Color interpolate(const Color& c1, const Color& c2, float factor);
          
     private:
-
-        static const float intToFloat;
 
         uint8_t r;
         uint8_t g;

@@ -2,8 +2,8 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-//#define SSD1306
-#define SH110X
+#define SSD1306
+//#define SH110X
 
 
 #if defined SSD1306 && defined SH110X
@@ -31,7 +31,6 @@ const uint8_t bsec_config_iaq[] = {
 #include "config/generic_33v_3s_4d/bsec_iaq.txt"
 };
 
-
 Color iaqLevel1(0,228,0);
 Color iaqLevel2(146,208,80);
 Color iaqLevel3(255,255,0);
@@ -47,7 +46,7 @@ Color co2Level4(254,215,0);
 Color co2Level5(238,98,36);
 Color co2Level6(232,38,46);
 
-#define BME680_I2C_ADDR BME680_I2C_ADDR_SECONDARY  // BME680_I2C_ADDR_PRIMARY or  BME680_I2C_ADDR_SECONDARY 
+#define BME680_I2C_ADDR BME680_I2C_ADDR_PRIMARY  // BME680_I2C_ADDR_PRIMARY or  BME680_I2C_ADDR_SECONDARY 
 
 #define STATE_SAVE_PERIOD    UINT32_C(360 * 60 * 1000) // 360 minutes - 4 times a day
 
@@ -65,12 +64,12 @@ Bsec             iaqSensor;
 SCD30            airSensor;
 
 #if defined(SSD1306)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 #elif defined(SH110X)
 Adafruit_SH110X  display(SCREEN_HEIGHT, SCREEN_WIDTH, &Wire);
 #endif
 
-Adafruit_NeoPixel strip(2, LED_PIN, NEO_RGB + NEO_KHZ800);
+Adafruit_NeoPixel strip(2, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // used to store the data that should be displayed
 struct displayData_t {
@@ -118,64 +117,62 @@ void errLeds(void)
     delay(100);
 }
 
-void setup(void)
-{
-  EEPROM.begin(BSEC_MAX_STATE_BLOB_SIZE + 1); // 1st address for the length
-  Serial.begin(115200);
-  while (!Serial) delay(10);
+void setup(void) {
+    EEPROM.begin(BSEC_MAX_STATE_BLOB_SIZE + 1); // 1st address for the length
+    Serial.begin(115200);
+    while (!Serial) delay(10);
 
-  strip.begin();          
-  strip.show();           
-  strip.setBrightness(15);
-  
-  Wire.begin();
+    strip.begin();          
+    strip.show();           
+    strip.setBrightness(10);
+
+    Wire.begin();
 
 #if defined(SSD1306)
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
-  display.setTextColor(WHITE);
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3D,true);
+    display.setTextColor(SSD1306_WHITE );
 #elif defined(SH110X)
-  display.begin(0x3C,true);
-  display.setRotation(1);
-  display.setTextColor(SH110X_WHITE);
+    display.begin(0x3C,true);
+    display.setRotation(1);
+    display.setTextColor(SH110X_WHITE);
 #endif
 
-  display.clearDisplay();
-  display.display();
+    display.clearDisplay();
+    display.display();
   
   //display.setFont(&FreeMono9pt7b);
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.println("CO2 Alerter");
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println("CO2 Alerter 1.0");
+    display.display();
 
-  display.display();
+    iaqSensor.begin(BME680_I2C_ADDR, Wire);
 
-  iaqSensor.begin(BME680_I2C_ADDR, Wire);
+    display.println("BSEC: " + String(iaqSensor.version.major) + "." + String(iaqSensor.version.minor) + "." + String(iaqSensor.version.major_bugfix) + "." + String(iaqSensor.version.minor_bugfix));
+    display.display();
 
-  display.println("BSEC: " + String(iaqSensor.version.major) + "." + String(iaqSensor.version.minor) + "." + String(iaqSensor.version.major_bugfix) + "." + String(iaqSensor.version.minor_bugfix));
-  display.display();
+    checkIaqSensorStatus();
 
-  checkIaqSensorStatus();
+    iaqSensor.setConfig(bsec_config_iaq);
+    checkIaqSensorStatus();
 
-  iaqSensor.setConfig(bsec_config_iaq);
-  checkIaqSensorStatus();
+    loadState();
 
-  loadState();
+    bsec_virtual_sensor_t sensorList[10] = {
+        BSEC_OUTPUT_RAW_TEMPERATURE,
+        BSEC_OUTPUT_RAW_PRESSURE,
+        BSEC_OUTPUT_RAW_HUMIDITY,
+        BSEC_OUTPUT_RAW_GAS,
+        BSEC_OUTPUT_IAQ,
+        BSEC_OUTPUT_STATIC_IAQ,
+        BSEC_OUTPUT_CO2_EQUIVALENT,
+        BSEC_OUTPUT_BREATH_VOC_EQUIVALENT,
+        BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE,
+        BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY,
+    };
 
-  bsec_virtual_sensor_t sensorList[10] = {
-    BSEC_OUTPUT_RAW_TEMPERATURE,
-    BSEC_OUTPUT_RAW_PRESSURE,
-    BSEC_OUTPUT_RAW_HUMIDITY,
-    BSEC_OUTPUT_RAW_GAS,
-    BSEC_OUTPUT_IAQ,
-    BSEC_OUTPUT_STATIC_IAQ,
-    BSEC_OUTPUT_CO2_EQUIVALENT,
-    BSEC_OUTPUT_BREATH_VOC_EQUIVALENT,
-    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE,
-    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY,
-  };
-
-  iaqSensor.updateSubscription(sensorList, 10, BSEC_SAMPLE_RATE_LP);
-  checkIaqSensorStatus();
+    iaqSensor.updateSubscription(sensorList, 10, BSEC_SAMPLE_RATE_LP);
+    checkIaqSensorStatus();
 
     if (airSensor.begin() == false) {
         display.println("Air sensor not detected. Please check wiring. Freezing...");
@@ -219,7 +216,7 @@ void loop(void) {
         }
 
         strip.setPixelColor(0, getIAQColor(displayData.bme680StaticIaq));
-        //strip.setPixelColor(1, getCO2Color(displayData.scd30Co2));
+        strip.setPixelColor(1, getCO2Color(displayData.scd30Co2));
         strip.show();
 
         updateDisplay();
@@ -309,6 +306,7 @@ void updateState(void)
 
     for (uint8_t i = 0; i < BSEC_MAX_STATE_BLOB_SIZE ; i++) {
       EEPROM.write(i + 1, bsecState[i]);
+
       Serial.println(bsecState[i], HEX);
     }
 
@@ -371,7 +369,9 @@ uint32_t getIAQColor(float iaqValue) {
         color1 = iaqLevel7;
         color2 = iaqLevel7;
     }
-    return Adafruit_NeoPixel::gamma32(Color::interpolate(color1,color2,normalizedValue).getPackedColor());
+
+    const Color c = Color::interpolate(color1,color2,normalizedValue);
+    return Adafruit_NeoPixel::gamma32(c.getPackedColorGRB());
 }
 
 /**
@@ -415,5 +415,8 @@ uint32_t getCO2Color(float co2Value) {
         color1 = co2Level6;
         color2 = co2Level6;
     }
-    return Adafruit_NeoPixel::gamma32(Color::interpolate(color1,color2,normalizedValue).getPackedColor());
+
+    const Color c = Color::interpolate(color1,color2,normalizedValue);
+    
+    return Adafruit_NeoPixel::gamma32(c.getPackedColorGRB());
 }
