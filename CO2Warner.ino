@@ -18,14 +18,13 @@
 #else
 #include <Adafruit_SH110X.h>
 #endif
-
+#include <Fonts/FreeSans18pt7b.h>
 #include <Fonts/FreeMono9pt7b.h>
 #include <Adafruit_NeoPixel.h>
 #include "bsec.h"
 #include "SparkFun_SCD30_Arduino_Library.h"
 #include "Color.h"
-
-const float INT_TO_FLOAT_CONST  = 1.0 / 255;
+#include "icons.h"
 
 const uint8_t bsec_config_iaq[] = {
 #include "config/generic_33v_3s_4d/bsec_iaq.txt"
@@ -71,6 +70,10 @@ Adafruit_SH110X  display(SCREEN_HEIGHT, SCREEN_WIDTH, &Wire);
 
 Adafruit_NeoPixel strip(2, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+unsigned long          previousMillis  = 0;
+
+Ticker currentDisplayTicker;
+
 // used to store the data that should be displayed
 struct displayData_t {
     float bme680Temperature;
@@ -87,12 +90,63 @@ struct displayData_t {
 
 volatile displayData_t displayData = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-Ticker displayTicker;
+const int     displaysCount      = 5;
+volatile int  currentDisplayIndx = 0;
+volatile bool readyForDisplay    = true;
 
-unsigned long          previousMillis  = 0;
+const int icon_data_pos_x = 0;  
+const int icon_data_pos_y = 1;  
+const int data_pos_x = 30;
+
+void displayTemperature() {
+    display.setFont(&FreeSans18pt7b);
+    display.setCursor(data_pos_x,(display.height() + 24) / 2);
+    display.setTextSize(1);
+    display.print((displayData.bme680Temperature + displayData.scd30Temperature) / 2,1);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, temperature_icon_bmp, temperature_icon_width, temperature_icon_height, WHITE); 
+    display.setFont();
+}
+
+void displayHumidity() {
+    display.setFont(&FreeSans18pt7b);
+    display.setCursor(data_pos_x,(display.height() + 24) / 2);
+    display.setTextSize(1);
+    display.print((displayData.bme680Humidity + displayData.scd30Humidity) / 2,0);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, humidity_icon_bmp, humidity_icon_width, humidity_icon_height, WHITE); 
+    display.setFont();
+}
+
+void displayPressure() {
+    display.setFont(&FreeSans18pt7b);
+    display.setCursor(data_pos_x,(display.height() + 24) / 2);
+    display.setTextSize(1);
+    display.print(displayData.bme680Pressure,0);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, pressure_icon_bmp, pressure_icon_width, pressure_icon_height, WHITE); 
+    display.setFont();
+}
+
+void displayStaticIaq() {
+    display.setFont(&FreeSans18pt7b);
+    display.setCursor(data_pos_x,(display.height() + 24) / 2);
+    display.setTextSize(1);
+    display.print(displayData.bme680StaticIaq,0);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, iaq_icon_bmp, iaq_icon_width, iaq_icon_height, WHITE); 
+    display.setFont();
+}
+
+void displayCO2() {
+    display.setFont(&FreeSans18pt7b);
+    display.setCursor(data_pos_x,(display.height() + 24) / 2);
+    display.setTextSize(1);
+    display.print(displayData.scd30Co2,0);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, co2_icon_bmp, co2_icon_width, co2_icon_height, WHITE); 
+    display.setFont();
+}
+
+void (*displays[displaysCount])(void)= {displayTemperature, displayHumidity, displayPressure, displayStaticIaq, displayCO2};
 
 void updateDisplay() {
-
+/*
     display.clearDisplay();
     display.setCursor(0, 0);
     display.print("Temp.    "); display.println(displayData.bme680Temperature);
@@ -105,6 +159,14 @@ void updateDisplay() {
     display.print("Hum.     "); display.println(displayData.scd30Humidity);
     
     display.display();    
+*/
+    display.clearDisplay();
+
+    Serial.println(currentDisplayIndx);
+    
+    (*displays[currentDisplayIndx])();    
+        
+    display.display();   
 }
 
 void errLeds(void)
@@ -183,7 +245,7 @@ void setup(void) {
     airSensor.setMeasurementInterval(10);
     airSensor.setAltitudeCompensation(330);
     
-//    displayTicker.attach(5,displayMeasurements);
+    currentDisplayTicker.attach(2,nextDisplay);
 }
 
 void loop(void) {
@@ -218,11 +280,24 @@ void loop(void) {
         strip.setPixelColor(0, getIAQColor(displayData.bme680StaticIaq));
         strip.setPixelColor(1, getCO2Color(displayData.scd30Co2));
         strip.show();
-
-        updateDisplay();
+        
         previousMillis = currentMillis;    
     }
+
+    if (readyForDisplay) {
+        updateDisplay();
+        readyForDisplay = false;
+    }
 }
+
+/**
+ * Functions used by the different ticker
+ */
+void nextDisplay() {
+    currentDisplayIndx = (currentDisplayIndx + 1) % displaysCount;
+    readyForDisplay    = true;
+}
+
 
 // Helper function definitions
 void checkIaqSensorStatus(void) {
@@ -405,7 +480,7 @@ uint32_t getCO2Color(float co2Value) {
         color1 = co2Level4;
         color2 = co2Level5;
         
-        normalizedValue = mapValue(co2Value, 950, 1250);
+        normalizedValue = mapValue(co2Value, 1250, 1500);
     } else if (co2Value > 1500 && co2Value <= 1850) {
         color1 = co2Level5;
         color2 = co2Level6;

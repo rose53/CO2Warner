@@ -13,4 +13,6 @@
 
 [BME680](https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/)
 
+[BSEC Arduino Library](https://github.com/BoschSensortec/BSEC-Arduino-library)
+
 [SCD30](https://www.sensirion.com/de/umweltsensoren/kohlendioxidsensor/kohlendioxidsensoren-co2/)
