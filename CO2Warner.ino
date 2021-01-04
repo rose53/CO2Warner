@@ -58,14 +58,17 @@ uint8_t bsecState[BSEC_MAX_STATE_BLOB_SIZE] = {0};
 uint16_t stateUpdateCounter = 0;
 
 #define LED_PIN        2
+#define ALTITUDE       330
 
 Bsec             iaqSensor;
 SCD30            airSensor;
 
 #if defined(SSD1306)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
+#define OLED_WHITE SSD1306_WHITE
 #elif defined(SH110X)
 Adafruit_SH110X  display(SCREEN_HEIGHT, SCREEN_WIDTH, &Wire);
+#define OLED_WHITE SH110X_WHITE
 #endif
 
 Adafruit_NeoPixel strip(2, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -103,7 +106,7 @@ void displayTemperature() {
     display.setCursor(data_pos_x,(display.height() + 24) / 2);
     display.setTextSize(1);
     display.print((displayData.bme680Temperature + displayData.scd30Temperature) / 2,1);
-    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, temperature_icon_bmp, temperature_icon_width, temperature_icon_height, WHITE); 
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, temperature_icon_bmp, temperature_icon_width, temperature_icon_height, OLED_WHITE); 
     display.setFont();
 }
 
@@ -112,7 +115,7 @@ void displayHumidity() {
     display.setCursor(data_pos_x,(display.height() + 24) / 2);
     display.setTextSize(1);
     display.print((displayData.bme680Humidity + displayData.scd30Humidity) / 2,0);
-    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, humidity_icon_bmp, humidity_icon_width, humidity_icon_height, WHITE); 
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, humidity_icon_bmp, humidity_icon_width, humidity_icon_height, OLED_WHITE); 
     display.setFont();
 }
 
@@ -120,8 +123,8 @@ void displayPressure() {
     display.setFont(&FreeSans18pt7b);
     display.setCursor(data_pos_x,(display.height() + 24) / 2);
     display.setTextSize(1);
-    display.print(displayData.bme680Pressure,0);
-    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, pressure_icon_bmp, pressure_icon_width, pressure_icon_height, WHITE); 
+    display.print(getSeaLevelPressure(displayData.bme680Pressure),0);
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, pressure_icon_bmp, pressure_icon_width, pressure_icon_height, OLED_WHITE); 
     display.setFont();
 }
 
@@ -130,7 +133,7 @@ void displayStaticIaq() {
     display.setCursor(data_pos_x,(display.height() + 24) / 2);
     display.setTextSize(1);
     display.print(displayData.bme680StaticIaq,0);
-    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, iaq_icon_bmp, iaq_icon_width, iaq_icon_height, WHITE); 
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, iaq_icon_bmp, iaq_icon_width, iaq_icon_height, OLED_WHITE); 
     display.setFont();
 }
 
@@ -139,27 +142,14 @@ void displayCO2() {
     display.setCursor(data_pos_x,(display.height() + 24) / 2);
     display.setTextSize(1);
     display.print(displayData.scd30Co2,0);
-    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, co2_icon_bmp, co2_icon_width, co2_icon_height, WHITE); 
+    display.drawBitmap(icon_data_pos_x,icon_data_pos_y, co2_icon_bmp, co2_icon_width, co2_icon_height, OLED_WHITE); 
     display.setFont();
 }
 
 void (*displays[displaysCount])(void)= {displayTemperature, displayHumidity, displayPressure, displayStaticIaq, displayCO2};
 
 void updateDisplay() {
-/*
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.print("Temp.    "); display.println(displayData.bme680Temperature);
-    display.print("Hum.     "); display.println(displayData.bme680Humidity);
-    display.print("Pressure "); display.println(displayData.bme680Pressure);
-    display.print("IAQ      "); display.println(displayData.bme680Iaq);
-    display.print("sIAQ     "); display.println(displayData.bme680StaticIaq);
-    display.print("CO2      "); display.println(displayData.scd30Co2);
-    display.print("Temp.    "); display.println(displayData.scd30Temperature);
-    display.print("Hum.     "); display.println(displayData.scd30Humidity);
-    
-    display.display();    
-*/
+
     display.clearDisplay();
 
     Serial.println(currentDisplayIndx);
@@ -192,13 +182,11 @@ void setup(void) {
 
 #if defined(SSD1306)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3D,true);
-    display.setTextColor(SSD1306_WHITE );
 #elif defined(SH110X)
     display.begin(0x3C,true);
-    display.setRotation(1);
-    display.setTextColor(SH110X_WHITE);
+    display.setRotation(1);    
 #endif
-
+    display.setTextColor(OLED_WHITE);
     display.clearDisplay();
     display.display();
   
@@ -494,4 +482,8 @@ uint32_t getCO2Color(float co2Value) {
     const Color c = Color::interpolate(color1,color2,normalizedValue);
     
     return Adafruit_NeoPixel::gamma32(c.getPackedColorGRB());
+}
+
+float getSeaLevelPressure(float atmosphericPressure) {
+    return atmosphericPressure / pow(1.0 - (ALTITUDE / 44330.0), 5.255);
 }
