@@ -180,12 +180,17 @@ void setup(void) {
 
     Wire.begin();
 
+    delay(50); // give the display some time on startup (https://learn.adafruit.com/monochrome-oled-breakouts/troubleshooting-2)
 #if defined(SSD1306)
     display.begin(SSD1306_SWITCHCAPVCC, 0x3D,true);
+    display.setRotation(2);    
 #elif defined(SH110X)
     display.begin(0x3C,true);
     display.setRotation(1);    
 #endif
+
+
+
     display.setTextColor(OLED_WHITE);
     display.clearDisplay();
     display.display();
